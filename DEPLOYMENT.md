@@ -10,17 +10,17 @@
 
 | Mục | Nội dung |
 |-----|----------|
-| Họ và tên | (điền họ tên) |
-| Mã học viên | (điền mã học viên) |
-| Repo | (điền link repo K4-L3A-DAY12-HoVaTen-MSSV-CloudServicesAndDeployment) |
+| Họ và tên | Nguyễn Hồng Phi |
+| Mã học viên | L3A202602750 |
+| Repo | https://github.com/HonPy-dev/K4-L3A-DAY12-NguyenHongPhi-L3A202602750-Cloud-Service-And-Deployment |
 
 ## Service
 
 | Mục | Nội dung |
 |-----|----------|
-| Public URL | https://TODO-thay-bang-url-that.up.railway.app |
-| Platform | Railway / Render / Cloud Run — (điền platform bạn dùng) |
-| Ngày deploy | (điền ngày) |
+| Public URL | https://day12-agent-production-7a68.up.railway.app |
+| Platform | Railway (deploy từ image Docker Hub `hongphi271205/day12-agent`) |
+| Ngày deploy | 2026-09-28 |
 
 ## Biến Môi Trường Đã Set Trên Cloud
 
@@ -29,8 +29,8 @@ Ghi tên biến và **nguồn giá trị**, không ghi giá trị:
 | Biến | Đã set | Ghi chú |
 |------|--------|---------|
 | `PORT` | ✅ | platform tự gán |
-| `AGENT_API_KEY` | ✅ | đặt trong dashboard, không nằm trong repo |
-| `REDIS_URL` | ✅ | (điền: Redis add-on của platform / Upstash / ...) |
+| `AGENT_API_KEY` | ✅ | đặt qua Railway CLI `railway variables set`, không nằm trong repo |
+| `REDIS_URL` | ✅ | Redis database add-on của chính project Railway (private network) |
 | `RATE_LIMIT_PER_MINUTE` | ✅ | 10 |
 | `MONTHLY_BUDGET_USD` | ✅ | 10.0 |
 | `LOG_LEVEL` | ✅ | INFO |
@@ -70,10 +70,25 @@ done; echo
 
 ## Kết Quả Chạy Thật
 
-Dán output của các lệnh trên vào đây:
+Output thật từ service đang chạy (2026-09-28):
 
 ```
-(điền output)
+$ curl -s https://day12-agent-production-7a68.up.railway.app/health
+{"status":"ok","service":"day12-agent","version":"1.0.0"}
+
+$ curl -s https://day12-agent-production-7a68.up.railway.app/ready
+{"status":"ready","redis":true}
+
+$ curl -s -o /dev/null -w "%{http_code}" -X POST .../ask -d '{"question":"Hello"}'   # không key
+401
+
+$ curl -s -X POST .../ask -H "X-API-Key: <key>" -H "X-User-Id: sv-test" -d '{"question":"Deploy la gi?"}'
+{"answer":"Ngắn gọn: Deploy la gi phụ thuộc vào ba yếu tố — cấu hình qua biến môi trường,
+health check để orchestrator biết trạng thái, và giới hạn tài nguyên.","user_id":"sv-test",
+"history_length":0,"cost_usd":2.265e-05,"tokens":{"in":3,"out":37}}
+
+$ rate limit: gọi 15 lần liên tiếp với cùng user
+200 200 200 200 200 200 200 200 200 200 429 429 429 429 429
 ```
 
 ## Ảnh Chụp Màn Hình
@@ -82,20 +97,3 @@ Dán output của các lệnh trên vào đây:
 
 - `screenshots/dashboard.png` — trang quản lý service trên platform
 - `screenshots/health.png` — kết quả gọi `/health` từ trình duyệt hoặc curl
-
----
-
-## Nếu Dùng Phương Án Dự Phòng
-
-Không đăng ký được tài khoản cloud? Vẫn nộp được bài, nhưng CP5 tối đa 60% điểm:
-
-1. Đặt `LOCAL_FALLBACK=true` trong `.env`
-2. Chạy `docker compose up -d` rồi kiểm tra `docker compose ps`
-3. Chụp màn hình vào `screenshots/`
-4. Chạy `pytest tests/test_cp5.py -v` — bộ test sẽ tự chuyển sang kiểm tra
-   `http://localhost:8000`
-5. Ghi rõ lý do không deploy được vào phần dưới đây:
-
-```
-(điền lý do nếu dùng phương án dự phòng, ngược lại xóa mục này)
-```

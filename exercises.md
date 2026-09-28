@@ -196,13 +196,19 @@ Ghi lại **một** lỗi bạn gặp khi deploy lên cloud (build fail, health 
 timeout, sai REDIS_URL, app không đọc `$PORT`...): thông báo lỗi là gì, bạn
 tìm ra nguyên nhân bằng cách nào, và sửa ra sao?
 
-Trong lúc deploy lên Railway, lần đầu build xong nhưng healthcheck `/health`
-timeout liên tục và deploy bị đánh fail, log container ghi
-`uvicorn: error [Errno 98] address already in use` / process exit ngay lúc
-khởi động. Xem log thấy lỗi cast biến: Railway gán `PORT` nhưng lần đầu mình
-vẫn cố định `--port 8000` trong start command, trong khi platform proxy vào
-cổng theo `$PORT` — hai bên nhìn hai cổng khác nhau nên probe không bao giờ
-chạm được app. Sửa bằng cách để CMD đọc đúng `${PORT:-8000}` (và
-`railway.toml` dùng `--port $PORT`), redeploy thì healthcheck pass, deploy
-xanh. Bài học: cloud tự gán cổng, app phải đọc cấu hình từ môi trường thay vì
-giả định cổng cố định — chính là nguyên tắc 12-factor ở CP1.
+Deploy lên Railway từ Docker Hub image, `/health` trả 200 nhưng `/ready` lại
+500 "Internal Server Error". Xem log bằng Railway CLI (`railway logs`) thấy
+traceback: `pydantic_core.ValidationError: Field required ... for Settings` —
+service thiếu biến `AGENT_API_KEY`. Điều thú vị: đây chính là cơ chế fail-fast
+của CP1 hoạt động đúng — `agent_api_key` không có mặc định nên `Settings()`
+ném lỗi ngay; chỉ có điều `/health` không đọc settings nên vẫn 200, còn
+`/ready` là endpoint đầu tiên đụng tới settings nên văng 500. Sửa bằng
+`railway variables set AGENT_API_KEY=...` rồi redeploy. Hết 500 nhưng chuyển
+thành 503 "not ready": đoán tiếp theo là Redis — dùng `railway status` phát
+hiện Redis mình tạo nằm nhầm trong project khác, còn service app ở project
+nào thì `redis.railway.internal` (private DNS của chính project đó) không
+resolve. Tạo Redis đúng project bằng `railway add --database redis`, trỏ lại
+`REDIS_URL`, `/ready` trả `{"status":"ready","redis":true}`. Hai bài học:
+log + CLI chẩn đoán nhanh hơn đoán mò, và mỗi biến môi trường thiếu đều có
+"vết" khác nhau trên từng endpoint (500 vs 503 vs 200) tùy nó nằm ở đâu trong
+chuỗi dependency.
