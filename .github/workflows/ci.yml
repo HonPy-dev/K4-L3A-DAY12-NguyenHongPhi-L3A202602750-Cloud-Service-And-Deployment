@@ -1,0 +1,70 @@
+name: CI/CD
+
+# Chạy khi push lên main và mọi pull request (bắt lỗi trước khi merge)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Cai dependencies
+        run: pip install -r requirements.txt
+
+      - name: Chay pytest
+        env:
+          AGENT_API_KEY: ci-dummy-key
+          REDIS_URL: fake://
+        # Bo test_cp5 (can service da deploy that) va test_bonus (chi cham local)
+        run: pytest tests/ --ignore=tests/test_cp5.py --ignore=tests/test_bonus_cicd.py -q
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t hongphi271205/day12-agent:ci-test .
+
+  deploy:
+    runs-on: ubuntu-latest
+    # Chi deploy khi test + build deu xanh VA la push truc tiep len main
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push image moi len Docker Hub
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: hongphi271205/day12-agent:latest
+
+      - name: Trigger Railway redeploy
+        run: |
+          curl -fsS -X POST "${{ secrets.RAILWAY_DEPLOY_HOOK }}" \
+            --retry 3 --retry-delay 5 || echo "Khong co deploy hook - bo qua"
+
+      - name: Cho deploy xong roi smoke test
+        run: |
+          sleep 90
+          curl -fsS --retry 5 --retry-delay 20 --max-time 60 \
+            "${{ secrets.PUBLIC_URL }}/health"
