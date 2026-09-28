@@ -66,5 +66,10 @@ jobs:
       - name: Cho deploy xong roi smoke test
         run: |
           sleep 90
-          curl -fsS --retry 5 --retry-delay 20 --max-time 60 \
-            "${{ secrets.PUBLIC_URL }}/health"
+          URL="${{ secrets.PUBLIC_URL }}"
+          case "$URL" in
+            https://*) ;;
+            *) URL="https://$URL" ;;
+          esac
+          echo "Smoke test: $URL/health"
+          curl -fsS --retry 5 --retry-delay 20 --max-time 60 "$URL/health"
